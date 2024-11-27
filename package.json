@@ -1,0 +1,20 @@
+{
+    "name": "backend",
+    "version": "1.0.0",
+    "description": "Backend para la aplicación",
+    "main": "server.js",
+    "scripts": {
+      "start": "node server.js"  
+    },
+    "dependencies": {
+      "express": "^4.17.1",
+      "mysql2": "^3.11.3",
+      "dotenv": "^16.4.5",
+      "cors": "^2.8.5"
+    },
+    "devDependencies": {},
+    "engines": {
+      "node": "16.x"  
+    }
+  }
+  
