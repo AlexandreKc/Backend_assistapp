@@ -19,7 +19,6 @@ const connection = mysql.createConnection({
   database: process.env.DB_NAME
 });
 
-
 // Establecer la conexión con MySQL
 connection.connect((err) => {
   if (err) {
@@ -78,7 +77,6 @@ app.post('/registro', (req, res) => {
   });
 });
 
-
 // Ruta para verificar si el correo existe
 app.post('/validar-correo', (req, res) => {
   const { correo } = req.body; // Obtener el correo del cuerpo de la solicitud
@@ -132,29 +130,6 @@ app.get('/usuarios', (req, res) => {
   });
 });
 
-app.post('/cambiar-contrasena', (req, res) => {
-  const { correo, nuevaContrasena } = req.body;
-  
-  // Validar que el correo y la nueva contraseña no sean nulos
-  if (!correo || !nuevaContrasena) {
-    return res.status(400).send({ error: 'Correo y contraseña son obligatorios.' });
-  }
-  
-  // Cambiar contrasena
-  Usuario.findOneAndUpdate({ correo: correo }, { contrasena: nuevaContrasena }, { new: true })
-  .then(usuario => {
-    if (!usuario) {
-      return res.status(404).send({ error: 'Usuario no encontrado.' });
-    }
-    res.send({ success: 'Contraseña cambiada exitosamente.' });
-  })
-  .catch(err => {
-    console.error('Error al cambiar la contraseña:', err);
-    res.status(500).send({ error: 'Error en el servidor.' });
-  });
-});
-
-
 app.listen(port, () => {
-  console.log(`Servidor en funcionamiento en http://localhost:${port}`);  // Este mensaje ya está correcto para tu local, no es un error
+  console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);  // Usa 0.0.0.0 para que se escuche desde cualquier interfaz
 });
