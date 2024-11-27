@@ -102,12 +102,10 @@ app.post('/validar-correo', (req, res) => {
 app.post('/cambiar-contrasena', (req, res) => {
   const { correo, nuevaContrasena } = req.body;
 
-  // Verificar que se proporcionaron el correo y la nueva contraseña
   if (!correo || !nuevaContrasena) {
     return res.status(400).json({ message: 'Por favor, proporciona el correo y la nueva contraseña' });
   }
 
-  // Consulta para actualizar la contraseña
   const query = 'UPDATE usuario SET contrasena = ? WHERE correo = ?';
   connection.query(query, [nuevaContrasena, correo], (err, results) => {
     if (err) {
@@ -116,10 +114,8 @@ app.post('/cambiar-contrasena', (req, res) => {
     }
 
     if (results.affectedRows > 0) {
-      // Si se actualizó la contraseña
       res.json({ message: 'Contraseña cambiada exitosamente' });
     } else {
-      // Si no se encontró el usuario
       res.status(404).json({ message: 'Correo no registrado' });
     }
   });
@@ -159,7 +155,6 @@ app.post('/cambiar-contrasena', (req, res) => {
 });
 
 
-// Iniciar el servidor
-app.listen(PORT, () => {
-  console.log(`Servidor en funcionamiento en http://localhost:${PORT}`);
+app.listen(port, () => {
+  console.log(`Servidor en funcionamiento en http://localhost:${port}`);  // Este mensaje ya está correcto para tu local, no es un error
 });
