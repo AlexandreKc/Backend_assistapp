@@ -2,7 +2,8 @@
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2');
-const bcrypt = require('bcryptjs'); 
+const bcrypt = require('bcryptjs');
+
 // Instancia express
 const app = express();
 const port = process.env.PORT || 3000;
@@ -11,24 +12,18 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Conexión a MySQL
-const connection = mysql.createConnection({
+// Crear un pool de conexiones
+const pool = mysql.createPool({
   host: process.env.DB_SERVER,
   user: process.env.DB_USER,
   password: process.env.DB_PASS,
-  database: process.env.DB_NAME
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,  // Ajusta el límite de conexiones según lo necesites
+  queueLimit: 0
 });
 
-// Establecer la conexión con MySQL
-connection.connect((err) => {
-  if (err) {
-    console.error('Error conectando a MySQL:', err.stack);
-    return;
-  }
-  console.log('Conectado a MySQL con ID de conexión:', connection.threadId);
-});
-
-// Ruta para manejar el login
+// Usar el pool para realizar consultas
 app.post('/login', (req, res) => {
   const { correo, password } = req.body;
   
@@ -37,13 +32,13 @@ app.post('/login', (req, res) => {
     return res.status(400).json({ message: 'Por favor, proporciona correo y contraseña' });
   }
   
-  // Consulta para verificar el correo
-  connection.query('SELECT nombre, id_tp_usuario, contrasena FROM usuario WHERE correo = ?', [correo], (err, results) => {
+  // Usar el pool para consultar la base de datos
+  pool.query('SELECT nombre, id_tp_usuario, contrasena FROM usuario WHERE correo = ?', [correo], (err, results) => {
     if (err) {
       console.error('Error en la consulta:', err.stack);
       return res.status(500).send('Error en la consulta');
     }
-    
+
     if (results.length > 0) {
       // Si el usuario existe, verificar la contraseña encriptada
       bcrypt.compare(password, results[0].contrasena, (err, isMatch) => {
@@ -87,7 +82,7 @@ app.post('/registro', (req, res) => {
 
     // Añadir la lógica para guardar el nuevo usuario en la base de datos
     const query = 'INSERT INTO usuario (correo, nombre, contrasena, id_tp_usuario) VALUES (?, ?, ?, 1)'; // id_tp_usuario por defecto es 1
-    connection.query(query, [correo, nombre, hashedPassword], (error, results) => {
+    pool.query(query, [correo, nombre, hashedPassword], (error, results) => {
       if (error) {
         return res.status(500).json({ error: 'Correo ya registrado, recupera tu contraseña' });
       }
@@ -102,7 +97,7 @@ app.post('/validar-correo', (req, res) => {
   
   // Consulta a la base de datos
   const query = 'SELECT * FROM usuario WHERE correo = ?';
-  connection.query(query, [correo], (err, results) => {
+  pool.query(query, [correo], (err, results) => {
     if (err) {
       res.status(500).json({ error: 'Error en el servidor' });
     } else {
@@ -130,7 +125,7 @@ app.post('/cambiar-contrasena', (req, res) => {
     }
 
     const query = 'UPDATE usuario SET contrasena = ? WHERE correo = ?';
-    connection.query(query, [hashedPassword, correo], (err, results) => {
+    pool.query(query, [hashedPassword, correo], (err, results) => {
       if (err) {
         console.error('Error en la consulta:', err.stack);
         return res.status(500).json({ message: 'Error al cambiar la contraseña' });
@@ -147,7 +142,7 @@ app.post('/cambiar-contrasena', (req, res) => {
 
 // Ruta para obtener todos los usuarios (ejemplo)
 app.get('/usuarios', (req, res) => {
-  connection.query('SELECT * FROM usuario', (err, results) => {
+  pool.query('SELECT * FROM usuario', (err, results) => {
     if (err) {
       console.error('Error en la consulta:', err.stack);
       return res.status(500).send('Error en la consulta');
@@ -157,5 +152,5 @@ app.get('/usuarios', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);  // Usa 0.0.0.0 para que se escuche desde cualquier interfaz
+  console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);
 });
