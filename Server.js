@@ -2,7 +2,7 @@
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2');
-
+const bcrypt = require('bcryptjs'); 
 // Instancia express
 const app = express();
 const port = process.env.PORT || 3000;
@@ -37,19 +37,31 @@ app.post('/login', (req, res) => {
     return res.status(400).json({ message: 'Por favor, proporciona correo y contraseña' });
   }
   
-  // Consulta para verificar las credenciales y obtener el nombre y el tipo de usuario
-  connection.query('SELECT nombre, id_tp_usuario FROM usuario WHERE correo = ? AND contrasena = ?', [correo, password], (err, results) => {
+  // Consulta para verificar el correo
+  connection.query('SELECT nombre, id_tp_usuario, contrasena FROM usuario WHERE correo = ?', [correo], (err, results) => {
     if (err) {
       console.error('Error en la consulta:', err.stack);
       return res.status(500).send('Error en la consulta');
     }
     
     if (results.length > 0) {
-      // Si el usuario existe, devolver el nombre y el id_tp_usuario
-      res.json({
-        valid: true,
-        nombre: results[0].nombre,
-        id_tp_usuario: results[0].id_tp_usuario // Incluir el tipo de usuario en la respuesta
+      // Si el usuario existe, verificar la contraseña encriptada
+      bcrypt.compare(password, results[0].contrasena, (err, isMatch) => {
+        if (err) {
+          return res.status(500).json({ message: 'Error al verificar la contraseña' });
+        }
+
+        if (isMatch) {
+          // Si las contraseñas coinciden
+          res.json({
+            valid: true,
+            nombre: results[0].nombre,
+            id_tp_usuario: results[0].id_tp_usuario // Incluir el tipo de usuario en la respuesta
+          });
+        } else {
+          // Si las contraseñas no coinciden
+          res.json({ valid: false });
+        }
       });
     } else {
       // Si no se encuentra el usuario, devolver respuesta inválida
@@ -66,14 +78,21 @@ app.post('/registro', (req, res) => {
   if (!nombre || !correo || !contrasena) {
     return res.status(400).json({ error: 'Todos los campos son requeridos.' });
   }
-  
-  // Añadir la lógica para guardar el nuevo usuario en la base de datos
-  const query = 'INSERT INTO usuario (correo, nombre, contrasena, id_tp_usuario) VALUES (?, ?, ?, 1)'; // id_tp_usuario por defecto es 1
-  connection.query(query, [correo, nombre, contrasena], (error, results) => {
-    if (error) {
-      return res.status(500).json({ error: 'Correo ya registrado, recupera tu contraseña' });
+
+  // Encriptar la contraseña antes de guardarla
+  bcrypt.hash(contrasena, 10, (err, hashedPassword) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error al encriptar la contraseña' });
     }
-    res.status(201).json({ message: 'Usuario fue registrado con éxito.' });
+
+    // Añadir la lógica para guardar el nuevo usuario en la base de datos
+    const query = 'INSERT INTO usuario (correo, nombre, contrasena, id_tp_usuario) VALUES (?, ?, ?, 1)'; // id_tp_usuario por defecto es 1
+    connection.query(query, [correo, nombre, hashedPassword], (error, results) => {
+      if (error) {
+        return res.status(500).json({ error: 'Correo ya registrado, recupera tu contraseña' });
+      }
+      res.status(201).json({ message: 'Usuario fue registrado con éxito.' });
+    });
   });
 });
 
@@ -104,18 +123,25 @@ app.post('/cambiar-contrasena', (req, res) => {
     return res.status(400).json({ message: 'Por favor, proporciona el correo y la nueva contraseña' });
   }
 
-  const query = 'UPDATE usuario SET contrasena = ? WHERE correo = ?';
-  connection.query(query, [nuevaContrasena, correo], (err, results) => {
+  // Encriptar la nueva contraseña antes de actualizarla
+  bcrypt.hash(nuevaContrasena, 10, (err, hashedPassword) => {
     if (err) {
-      console.error('Error en la consulta:', err.stack);
-      return res.status(500).json({ message: 'Error al cambiar la contraseña' });
+      return res.status(500).json({ message: 'Error al encriptar la nueva contraseña' });
     }
 
-    if (results.affectedRows > 0) {
-      res.json({ message: 'Contraseña cambiada exitosamente' });
-    } else {
-      res.status(404).json({ message: 'Correo no registrado' });
-    }
+    const query = 'UPDATE usuario SET contrasena = ? WHERE correo = ?';
+    connection.query(query, [hashedPassword, correo], (err, results) => {
+      if (err) {
+        console.error('Error en la consulta:', err.stack);
+        return res.status(500).json({ message: 'Error al cambiar la contraseña' });
+      }
+
+      if (results.affectedRows > 0) {
+        res.json({ message: 'Contraseña cambiada exitosamente' });
+      } else {
+        res.status(404).json({ message: 'Correo no registrado' });
+      }
+    });
   });
 });
 
