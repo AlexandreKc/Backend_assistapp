@@ -160,10 +160,7 @@ app.get('/materias/usuario/:usuarioId', (req, res) => {
 
   // Consulta para obtener las materias asociadas al usuario
   const query = `
-    SELECT m.id, m.nombre, m.descripcion
-    FROM materias m
-    JOIN usuario_materia um ON m.id = um.id_materia
-    WHERE um.id_usuario = ?
+  Select um.materia_id,m.nombre,m.descripcion from usuario_materia um inner join materias m on um.materia_id=m.id where usuario_id=1;
   `;
 
   // Realizar la consulta usando el pool de conexiones
