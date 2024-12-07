@@ -162,7 +162,10 @@ app.get('/materias/usuario/:usuarioId', (req, res) => {
 
   // Consulta para obtener las materias asociadas al usuario
   const query = `
-  Select um.materia_id,m.nombre,m.descripcion from usuario_materia um inner join materias m on um.materia_id=m.id where usuario_id=1;
+    SELECT um.materia_id, m.nombre, m.descripcion 
+    FROM usuario_materia um 
+    INNER JOIN materias m ON um.materia_id = m.id 
+    WHERE um.usuario_id = ?;
   `;
 
   // Realizar la consulta usando el pool de conexiones
@@ -176,6 +179,7 @@ app.get('/materias/usuario/:usuarioId', (req, res) => {
     res.json(results);
   });
 });
+
 
 app.listen(port, () => {
   console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);
