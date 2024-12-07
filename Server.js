@@ -33,7 +33,7 @@ app.post('/login', (req, res) => {
   }
   
   // Usar el pool para consultar la base de datos
-  pool.query('SELECT nombre, id_tp_usuario, contrasena FROM usuario WHERE correo = ?', [correo], (err, results) => {
+  pool.query('SELECT id, nombre, id_tp_usuario, contrasena FROM usuario WHERE correo = ?', [correo], (err, results) => {
     if (err) {
       console.error('Error en la consulta:', err.stack);
       return res.status(500).send('Error en la consulta');
@@ -50,6 +50,7 @@ app.post('/login', (req, res) => {
           // Si las contraseñas coinciden
           res.json({
             valid: true,
+            id: results[0].id,  // Enviar el ID del usuario
             nombre: results[0].nombre,
             id_tp_usuario: results[0].id_tp_usuario // Incluir el tipo de usuario en la respuesta
           });
@@ -64,6 +65,7 @@ app.post('/login', (req, res) => {
     }
   });
 });
+
 
 // Endpoint para registrar un nuevo usuario
 app.post('/registro', (req, res) => {
