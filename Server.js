@@ -150,6 +150,33 @@ app.get('/usuarios', (req, res) => {
     res.json(results);
   });
 });
+// Endpoint para obtener las materias de un usuario logueado
+app.get('/materias', (req, res) => {
+  const { usuario_id } = req.query;  // Obtener el usuario_id desde los parámetros de la URL
+
+  if (!usuario_id) {
+    return res.status(400).json({ message: 'Por favor, proporciona el usuario_id' });
+  }
+
+  // Consulta SQL para obtener las materias asociadas al usuario
+  const query = `
+    SELECT m.id, m.nombre, m.descripcion
+    FROM materias m
+    JOIN usuario_materia um ON m.id = um.materia_id
+    WHERE um.usuario_id = ?
+  `;
+
+  // Realizar la consulta usando el pool de conexiones
+  pool.query(query, [usuario_id], (err, results) => {
+    if (err) {
+      console.error('Error al obtener las materias:', err.stack);
+      return res.status(500).json({ message: 'Error al obtener las materias' });
+    }
+
+    // Enviar las materias como respuesta en formato JSON
+    res.json(results);
+  });
+});
 
 app.listen(port, () => {
   console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);
