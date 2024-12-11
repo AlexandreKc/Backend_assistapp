@@ -198,8 +198,8 @@ app.post('/crear-clase', (req, res) => {
     return res.status(400).json({ message: 'Por favor, proporciona el id de la materia' });
   }
 
-  // Obtener el nombre de la materia y la descripción para generar el nombre de la clase
-  pool.query('SELECT nombre, descripcion FROM materias WHERE id = ?', [idMateria], (err, results) => {
+  // Obtener el nombre de la materia para generar el nombre de la clase
+  pool.query('SELECT nombre FROM materias WHERE id = ?', [idMateria], (err, results) => {
     if (err) {
       console.error('Error al obtener los detalles de la materia:', err.stack);
       return res.status(500).json({ message: 'Error al obtener los detalles de la materia' });
@@ -210,7 +210,6 @@ app.post('/crear-clase', (req, res) => {
     }
 
     const nombreMateria = results[0].nombre;
-    const descripcionMateria = results[0].descripcion;
 
     // Obtener el número de la última clase creada para esta materia
     pool.query('SELECT COUNT(*) AS totalClases FROM clases WHERE id_materia = ?', [idMateria], (err, results) => {
@@ -227,10 +226,13 @@ app.post('/crear-clase', (req, res) => {
       // Crear el ID de la nueva clase (6 caracteres aleatorios)
       const idClase = Math.random().toString(36).substring(2, 8).toUpperCase();
 
+      // Obtener la fecha actual
+      const fechaCreacion = new Date();
+
       // Insertar la nueva clase en la base de datos
       pool.query(
-        'INSERT INTO clases (id_materia, nombre, descripcion) VALUES (?, ?, ?)',
-        [idMateria, nombreClase, descripcionMateria],
+        'INSERT INTO clases (id_clase, id_materia, nombre, fecha_creacion) VALUES (?, ?, ?, ?)',
+        [idClase, idMateria, nombreClase, fechaCreacion],
         (err, results) => {
           if (err) {
             console.error('Error al insertar la clase:', err.stack);
