@@ -180,16 +180,15 @@ app.get('/materias/usuario/:usuarioId', (req, res) => {
   });
 });
 // Endpoint para obtener todas las materias
-app.get('/materias', async (req, res) => {
-  try {
-    const [rows] = await db.query('SELECT * FROM materias');
-    res.json(rows); 
-  } catch (error) {
-    console.error('Error al obtener las materias:', error);
-    res.status(500).json({ message: 'Error al obtener las materias' });
-  }
+app.get('/materias', (req, res) => {
+  pool.query('SELECT * FROM materias', (err, results) => {
+    if (err) {
+      console.error('Error en la consulta:', err.stack);
+      return res.status(500).send('Error en la consulta');
+    }
+    res.json(results);
+  });
 });
-
 
 app.listen(port, () => {
   console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);
