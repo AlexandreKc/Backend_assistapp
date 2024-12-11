@@ -259,6 +259,30 @@ function generateRandomID() {
   }
   return randomID;
 }
+// Ruta para obtener todas las clases de una materia específica
+app.get('/clases/materia/:materiaId', (req, res) => {
+  const { materiaId } = req.params;  // Obtener el materiaId de los parámetros de la URL
+
+  if (!materiaId) {
+    return res.status(400).json({ message: 'Por favor, proporciona un materiaId' });
+  }
+
+  // Consulta para obtener las clases asociadas a la materia
+  const query = `
+    SELECT c.id_clase, c.nombre, c.fecha_creacion 
+    FROM clases c
+    WHERE c.id_materia = ?;
+  `;
+
+  pool.query(query, [materiaId], (err, results) => {
+    if (err) {
+      console.error('Error al obtener las clases:', err.stack);
+      return res.status(500).json({ message: 'Error al obtener las clases' });
+    }
+
+    res.json(results);
+  });
+});
 
 
 app.listen(port, () => {
