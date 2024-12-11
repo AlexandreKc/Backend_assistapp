@@ -239,8 +239,8 @@ app.post('/crear-clase', (req, res) => {
 
           res.status(201).json({
             message: 'Clase creada exitosamente',
-            idClase: idClase,  // ID de la clase generada
-            nombreClase: nombreClase  // Nombre de la clase generada
+            idClase: idClase,  
+            nombreClase: nombreClase  
           });
         }
       );
