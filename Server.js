@@ -179,6 +179,16 @@ app.get('/materias/usuario/:usuarioId', (req, res) => {
     res.json(results);
   });
 });
+// Endpoint para obtener todas las materias
+app.get('/materias', async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT * FROM materias');
+    res.json(rows); 
+  } catch (error) {
+    console.error('Error al obtener las materias:', error);
+    res.status(500).json({ message: 'Error al obtener las materias' });
+  }
+});
 
 
 app.listen(port, () => {
