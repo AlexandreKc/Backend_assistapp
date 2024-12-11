@@ -189,6 +189,63 @@ app.get('/materias', (req, res) => {
     res.json(results);
   });
 });
+// Ruta para crear una nueva clase
+app.post('/crear-clase', (req, res) => {
+  const { id_materia } = req.body;  // Obtener el ID de la materia de la solicitud
+
+  if (!id_materia) {
+    return res.status(400).json({ message: 'Por favor, proporciona el id de la materia' });
+  }
+
+  //Obtener la última clase registrada para esa materia
+  pool.query('SELECT nombre FROM clases WHERE id_materia = ? ORDER BY id_clase DESC LIMIT 1', [id_materia], (err, results) => {
+    if (err) {
+      console.error('Error al obtener la última clase:', err.stack);
+      return res.status(500).json({ message: 'Error al obtener la última clase' });
+    }
+
+    let claseNumero = 1;  
+
+    if (results.length > 0) {
+      const ultimaClase = results[0].nombre;
+      const match = ultimaClase.match(/Clase (\d+)/);
+
+      if (match && match[1]) {
+        claseNumero = parseInt(match[1]) + 1;  
+      }
+    }
+    //Generar un ID de clase aleatorio de 6 caracteres
+    const idClase = generateRandomID();
+
+    //Insertar la nueva clase en la base de datos
+    const nombreClase = `Clase ${claseNumero}`;
+    const query = 'INSERT INTO clases (id_clase, id_materia, nombre) VALUES (?, ?, ?)';
+
+    pool.query(query, [idClase, id_materia, nombreClase], (err, results) => {
+      if (err) {
+        console.error('Error al insertar la clase:', err.stack);
+        return res.status(500).json({ message: 'Error al insertar la clase' });
+      }
+
+      res.status(201).json({
+        message: 'Clase creada con éxito',
+        id_clase: idClase,
+        nombre: nombreClase
+      });
+    });
+  });
+});
+
+// Función para generar un ID aleatorio de 6 caracteres
+function generateRandomID() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let randomID = '';
+  for (let i = 0; i < 6; i++) {
+    randomID += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return randomID;
+}
+
 
 app.listen(port, () => {
   console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);
