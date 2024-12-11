@@ -191,47 +191,59 @@ app.get('/materias', (req, res) => {
 });
 // Ruta para crear una nueva clase
 app.post('/crear-clase', (req, res) => {
-  const { id_materia } = req.body;  // Obtener el ID de la materia de la solicitud
+  const { idMateria } = req.body;
 
-  if (!id_materia) {
+  // Validar si se proporcionó el idMateria
+  if (!idMateria) {
     return res.status(400).json({ message: 'Por favor, proporciona el id de la materia' });
   }
 
-  //Obtener la última clase registrada para esa materia
-  pool.query('SELECT nombre FROM clases WHERE id_materia = ? ORDER BY id_clase DESC LIMIT 1', [id_materia], (err, results) => {
+  // Obtener el nombre de la materia y la descripción para generar el nombre de la clase
+  pool.query('SELECT nombre, descripcion FROM materias WHERE id = ?', [idMateria], (err, results) => {
     if (err) {
-      console.error('Error al obtener la última clase:', err.stack);
-      return res.status(500).json({ message: 'Error al obtener la última clase' });
+      console.error('Error al obtener los detalles de la materia:', err.stack);
+      return res.status(500).json({ message: 'Error al obtener los detalles de la materia' });
     }
 
-    let claseNumero = 1;  
-
-    if (results.length > 0) {
-      const ultimaClase = results[0].nombre;
-      const match = ultimaClase.match(/Clase (\d+)/);
-
-      if (match && match[1]) {
-        claseNumero = parseInt(match[1]) + 1;  
-      }
+    if (results.length === 0) {
+      return res.status(404).json({ message: 'Materia no encontrada' });
     }
-    //Generar un ID de clase aleatorio de 6 caracteres
-    const idClase = generateRandomID();
 
-    //Insertar la nueva clase en la base de datos
-    const nombreClase = `Clase ${claseNumero}`;
-    const query = 'INSERT INTO clases (id_clase, id_materia, nombre) VALUES (?, ?, ?)';
+    const nombreMateria = results[0].nombre;
+    const descripcionMateria = results[0].descripcion;
 
-    pool.query(query, [idClase, id_materia, nombreClase], (err, results) => {
+    // Obtener el número de la última clase creada para esta materia
+    pool.query('SELECT COUNT(*) AS totalClases FROM clases WHERE id_materia = ?', [idMateria], (err, results) => {
       if (err) {
-        console.error('Error al insertar la clase:', err.stack);
-        return res.status(500).json({ message: 'Error al insertar la clase' });
+        console.error('Error al contar las clases:', err.stack);
+        return res.status(500).json({ message: 'Error al contar las clases' });
       }
 
-      res.status(201).json({
-        message: 'Clase creada con éxito',
-        id_clase: idClase,
-        nombre: nombreClase
-      });
+      const claseNumero = results[0].totalClases + 1;  // Incrementar el número de clase
+
+      // Generar el nombre de la clase concatenando el nombre de la materia y el número de clase
+      const nombreClase = `${nombreMateria} clase ${claseNumero}`;
+
+      // Crear el ID de la nueva clase (6 caracteres aleatorios)
+      const idClase = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+      // Insertar la nueva clase en la base de datos
+      pool.query(
+        'INSERT INTO clases (id_materia, nombre, descripcion) VALUES (?, ?, ?)',
+        [idMateria, nombreClase, descripcionMateria],
+        (err, results) => {
+          if (err) {
+            console.error('Error al insertar la clase:', err.stack);
+            return res.status(500).json({ message: 'Error al insertar la clase' });
+          }
+
+          res.status(201).json({
+            message: 'Clase creada exitosamente',
+            idClase: idClase,  // ID de la clase generada
+            nombreClase: nombreClase  // Nombre de la clase generada
+          });
+        }
+      );
     });
   });
 });
