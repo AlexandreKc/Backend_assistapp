@@ -290,7 +290,7 @@ app.get('/:idMateria/alumnos', async (req, res) => {
     const query = `
       SELECT u.id, u.nombre, u.correo 
       FROM usuario_materia um
-      JOIN usuarios u ON um.usuario_id = u.id
+      JOIN usuario u ON um.usuario_id = u.id
       WHERE um.materia_id = ?`;
     // Ejecutando la consulta usando promesas con pool.query
     pool.query(query, [idMateria], (err, results) => {
