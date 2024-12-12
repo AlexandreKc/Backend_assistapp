@@ -319,7 +319,7 @@ app.get('/clases/:idClase/alumnos', async (req, res) => {
   }
 });
 // Endpoint que utilizaré para actualizar la asistencia
-router.post('/update-asistencia', (req, res) => {
+app.post('/update-asistencia', (req, res) => {
   const { id_clase, id_usuario } = req.body;
 
   // Verificar si los parámetros están presentes
