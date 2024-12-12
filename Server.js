@@ -284,7 +284,7 @@ app.get('/clases/materia/:materiaId', (req, res) => {
   });
 });
 //obtener alumnos de una materia
-app.get('/:idMateria/alumnos', async (req, res) => {
+app.get('/materias/:idMateria/alumnos', async (req, res) => {
   const { idMateria } = req.params;
   try {
     const query = `
@@ -292,7 +292,6 @@ app.get('/:idMateria/alumnos', async (req, res) => {
       FROM usuario_materia um
       JOIN usuario u ON um.usuario_id = u.id
       WHERE um.materia_id = ?`;
-    // Ejecutando la consulta usando promesas con pool.query
     pool.query(query, [idMateria], (err, results) => {
       if (err) {
         console.error('Error en la consulta:', err.stack);
