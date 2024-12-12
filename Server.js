@@ -269,7 +269,7 @@ app.get('/clases/materia/:materiaId', (req, res) => {
 
   // Consulta para obtener las clases asociadas a la materia
   const query = `
-    SELECT c.id_clase, c.nombre, c.fecha_creacion 
+    SELECT c.id_materia, c.id_clase, c.nombre, c.fecha_creacion 
     FROM clases c
     WHERE c.id_materia = ?;
   `;
