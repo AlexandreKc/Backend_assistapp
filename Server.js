@@ -283,6 +283,22 @@ app.get('/clases/materia/:materiaId', (req, res) => {
     res.json(results);
   });
 });
+//obtener alumnos de una materia
+router.get('/:idMateria/alumnos', async (req, res) => {
+  const { idMateria } = req.params;
+  try {
+    const query = `
+      SELECT u.id, u.nombre, u.correo 
+      FROM usuario_materia um
+      JOIN usuarios u ON um.usuario_id = u.id
+      WHERE um.materia_id = ?`;
+    const [rows] = await db.execute(query, [idMateria]);
+    res.json({ alumnos: rows });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener los alumnos de la materia' });
+  }
+});
 
 
 app.listen(port, () => {
