@@ -250,15 +250,7 @@ app.post('/crear-clase', (req, res) => {
   });
 });
 
-// Función para generar un ID aleatorio de 6 caracteres
-function generateRandomID() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let randomID = '';
-  for (let i = 0; i < 6; i++) {
-    randomID += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return randomID;
-}
+
 // Ruta para obtener todas las clases de una materia específica
 app.get('/clases/materia/:materiaId', (req, res) => {
   const { materiaId } = req.params;  // Obtener el materiaId de los parámetros de la URL
