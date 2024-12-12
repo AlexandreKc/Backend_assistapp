@@ -189,7 +189,7 @@ app.get('/materias', (req, res) => {
     res.json(results);
   });
 });
-// Ruta para crear una nueva clase
+// Ruta para crear una nueva clase y registrar la asistencia
 app.post('/crear-clase', (req, res) => {
   const { idMateria } = req.body;
 
@@ -218,7 +218,7 @@ app.post('/crear-clase', (req, res) => {
         return res.status(500).json({ message: 'Error al contar las clases' });
       }
 
-      const claseNumero = results[0].totalClases + 1;  // Incrementar el número de clase
+      const claseNumero = results[0].totalClases + 1; // Incrementar el número de clase
 
       // Generar el nombre de la clase concatenando el nombre de la materia y el número de clase
       const nombreClase = `${nombreMateria} clase ${claseNumero}`;
@@ -239,16 +239,54 @@ app.post('/crear-clase', (req, res) => {
             return res.status(500).json({ message: 'Error al insertar la clase' });
           }
 
-          res.status(201).json({
-            message: 'Clase creada exitosamente',
-            idClase: idClase,  
-            nombreClase: nombreClase  
-          });
+          // Obtener los alumnos asociados a la materia
+          pool.query(
+            `SELECT u.id AS id_usuario, u.nombre AS nombre_usuario 
+             FROM usuario_materia um 
+             JOIN usuario u ON um.usuario_id = u.id 
+             WHERE um.materia_id = ?`,
+            [idMateria],
+            (err, alumnos) => {
+              if (err) {
+                console.error('Error al obtener los alumnos:', err.stack);
+                return res.status(500).json({ message: 'Error al obtener los alumnos' });
+              }
+
+              if (alumnos.length === 0) {
+                return res.status(404).json({ message: 'No hay alumnos asociados a esta materia' });
+              }
+
+              // Registrar a los alumnos como "Ausente" en la tabla de asistencia
+              const asistenciaValues = alumnos.map(
+                (alumno) => [alumno.id_usuario, idClase, idMateria, alumno.nombre_usuario, 2] // "2" es el ID para "Ausente"
+              );
+
+              pool.query(
+                'INSERT INTO asistencia (id_usuario, id_clase, id_materia, nombre_usuario, id_tp_asistencia) VALUES ?',
+                [asistenciaValues],
+                (err) => {
+                  if (err) {
+                    console.error('Error al registrar asistencia:', err.stack);
+                    return res.status(500).json({ message: 'Error al registrar asistencia' });
+                  }
+
+                  // Respuesta exitosa
+                  res.status(201).json({
+                    message: 'Clase creada y asistencia registrada exitosamente',
+                    idClase: idClase,
+                    nombreClase: nombreClase,
+                    totalAlumnos: alumnos.length,
+                  });
+                }
+              );
+            }
+          );
         }
       );
     });
   });
 });
+
 
 // Función para generar un ID aleatorio de 6 caracteres
 function generateRandomID() {
