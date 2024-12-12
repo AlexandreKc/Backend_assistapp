@@ -318,6 +318,24 @@ app.get('/clases/:idClase/alumnos', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener los alumnos de la clase' });
   }
 });
+//Endpoint que utilizaré para actualizar la asistencia
+router.post('/update-asistencia', (req, res) => {
+  const { id_clase, id_usuario } = req.body;
+
+  if (!id_clase || !id_usuario) {
+    return res.status(400).json({ error: 'Faltan parámetros' });
+  }
+
+  // Aquí actualizamos el id_tp_asistencia
+  const query = 'UPDATE asistencia SET id_tp_asistencia = 2 WHERE id_clase = ? AND id_usuario = ?';
+  
+  db.query(query, [id_clase, id_usuario], (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: 'Error al actualizar la asistencia' });
+    }
+    res.status(200).json({ message: 'Asistencia actualizada correctamente' });
+  });
+});
 app.listen(port, () => {
   console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);
 });
