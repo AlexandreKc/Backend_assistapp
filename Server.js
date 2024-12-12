@@ -296,7 +296,28 @@ app.get('/materias/:idMateria/alumnos', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener los alumnos de la materia' });
   }
 });
-
+// Obtener alumnos de una clase
+app.get('/clases/:idClase/alumnos', async (req, res) => {
+  const { idClase } = req.params;
+  try {
+    const query = `
+      SELECT u.id, u.nombre, u.correo, a.id_tp_asistencia
+      FROM asistencia a
+      JOIN usuario u ON a.id_usuario = u.id
+      WHERE a.id_clase = ?`;
+    
+    pool.query(query, [idClase], (err, results) => {
+      if (err) {
+        console.error('Error en la consulta:', err.stack);
+        return res.status(500).send('Error en la consulta');
+      }
+      res.json({ alumnos: results });
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener los alumnos de la clase' });
+  }
+});
 app.listen(port, () => {
   console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);
 });
