@@ -377,6 +377,7 @@ app.get('/conteo-asistencia/:usuarioId', (req, res) => {
       SUM(CASE WHEN a.id_tp_asistencia = 1 THEN 1 ELSE 0 END) AS asistencias
     FROM clases c
     LEFT JOIN asistencia a ON c.id = a.id_clase AND a.id_usuario = ?
+    WHERE c.id_materia IN (SELECT materia_id FROM usuario_materia WHERE usuario_id = ?)
     GROUP BY c.id, c.id_materia;
   `;
 
@@ -387,7 +388,7 @@ app.get('/conteo-asistencia/:usuarioId', (req, res) => {
       return res.status(500).json({ message: 'Error al obtener las materias.' });
     }
 
-    pool.query(queryClases, [usuarioId], (errClases, clases) => {
+    pool.query(queryClases, [usuarioId, usuarioId], (errClases, clases) => {
       if (errClases) {
         console.error('Error al obtener las clases:', errClases);
         return res.status(500).json({ message: 'Error al obtener las clases.' });
