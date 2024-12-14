@@ -327,9 +327,12 @@ app.options('/update-asistencia', (req, res) => {
 });
 
 app.post('/update-asistencia', (req, res) => {
+  console.log('Solicitud POST recibida:', req.body);
+
   const { id_clase, id_usuario } = req.body;
 
   if (!id_clase || !id_usuario) {
+    console.error('Faltan parámetros:', req.body);
     return res.status(400).json({ error: 'Faltan parámetros' });
   }
 
@@ -342,13 +345,14 @@ app.post('/update-asistencia', (req, res) => {
     }
 
     if (result.affectedRows === 0) {
+      console.warn('No se encontró el registro para actualizar');
       return res.status(404).json({ error: 'No se encontró la clase o el usuario para actualizar' });
     }
 
+    console.log('Asistencia actualizada correctamente');
     res.status(200).json({ message: 'Asistencia actualizada correctamente' });
   });
 });
-
 
 app.listen(port, () => {
   console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);
