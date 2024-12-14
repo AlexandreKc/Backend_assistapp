@@ -349,8 +349,8 @@ app.post('/update-asistencia', (req, res) => {
       return res.status(404).json({ error: 'No se encontró la clase o el usuario para actualizar' });
     }
 
-    console.log('Asistencia actualizada correctamente');
-    res.status(200).json({ message: 'Asistencia actualizada correctamente' });
+    // console.log('Asistencia actualizada correctamente');
+    // res.status(200).json({ message: 'Asistencia actualizada correctamente' });
   });
 });
 
