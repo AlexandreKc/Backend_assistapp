@@ -353,43 +353,63 @@ app.post('/update-asistencia', (req, res) => {
     // res.status(200).json({ message: 'Asistencia actualizada correctamente' });
   });
 });
-app.get('/conteo-asistencia/:idUsuario/:idMateria', (req, res) => {
-  const { idUsuario, idMateria } = req.params;
+//metodo para contar clases y asistencias
+app.get('/conteo-asistencia/:usuarioId', (req, res) => {
+  const { usuarioId } = req.params;
 
-  const queryTotalClases = `
-    SELECT COUNT(DISTINCT id_clase) AS totalClases
-    FROM asistencia
-    WHERE id_materia = ?;
+  if (!usuarioId) {
+    return res.status(400).json({ message: 'Por favor, proporciona un usuarioId válido.' });
+  }
+
+  const queryMaterias = `
+    SELECT um.materia_id, m.nombre AS materia_nombre, m.descripcion
+    FROM usuario_materia um
+    INNER JOIN materias m ON um.materia_id = m.id
+    WHERE um.usuario_id = ?;
   `;
 
-  const queryAsistencias = `
-    SELECT COUNT(*) AS asistencias
-    FROM asistencia
-    WHERE id_usuario = ? AND id_materia = ? AND id_tp_asistencia = 1;
+  const queryClases = `
+    SELECT 
+      c.id AS clase_id, 
+      c.nombre AS clase_nombre, 
+      c.id_materia,
+      COUNT(a.id_tp_asistencia) AS total_asistencias,
+      SUM(CASE WHEN a.id_tp_asistencia = 1 THEN 1 ELSE 0 END) AS asistencias
+    FROM clases c
+    LEFT JOIN asistencia a ON c.id = a.id_clase AND a.id_usuario = ?
+    GROUP BY c.id, c.id_materia;
   `;
 
-  const totalClasesPromise = new Promise((resolve, reject) => {
-    pool.query(queryTotalClases, [idMateria], (err, results) => {
-      if (err) return reject(err);
-      resolve(results[0].totalClases);
+  // Ejecutar las dos consultas
+  pool.query(queryMaterias, [usuarioId], (errMaterias, materias) => {
+    if (errMaterias) {
+      console.error('Error al obtener las materias:', errMaterias);
+      return res.status(500).json({ message: 'Error al obtener las materias.' });
+    }
+
+    pool.query(queryClases, [usuarioId], (errClases, clases) => {
+      if (errClases) {
+        console.error('Error al obtener las clases:', errClases);
+        return res.status(500).json({ message: 'Error al obtener las clases.' });
+      }
+
+      const resultado = materias.map((materia) => {
+        const clasesMateria = clases.filter((clase) => clase.id_materia === materia.materia_id);
+
+        return {
+          materia_id: materia.materia_id,
+          materia_nombre: materia.materia_nombre,
+          descripcion: materia.descripcion,
+          clases: clasesMateria,
+          total_clases: clasesMateria.length,
+          total_asistencias: clasesMateria.reduce((sum, clase) => sum + clase.total_asistencias, 0),
+          total_asistidas: clasesMateria.reduce((sum, clase) => sum + clase.asistencias, 0),
+        };
+      });
+
+      res.json(resultado);
     });
   });
-
-  const asistenciasPromise = new Promise((resolve, reject) => {
-    pool.query(queryAsistencias, [idUsuario, idMateria], (err, results) => {
-      if (err) return reject(err);
-      resolve(results[0].asistencias);
-    });
-  });
-
-  Promise.all([totalClasesPromise, asistenciasPromise])
-    .then(([totalClases, asistencias]) => {
-      res.json({ totalClases, asistencias });
-    })
-    .catch((err) => {
-      console.error('Error al obtener conteo de asistencia:', err);
-      res.status(500).json({ error: 'Error al obtener conteo de asistencia' });
-    });
 });
 
 
