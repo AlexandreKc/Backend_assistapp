@@ -434,14 +434,7 @@ app.get('/clases-faltantes/:usuarioId', (req, res) => {
     res.json(clasesFaltantes);
   });
 });
-app.use(cors({
-  origin: 'http://example.com', 
-  methods: ['GET', 'POST', 'PUT', 'DELETE'], 
-  allowedHeaders: ['Content-Type', 'Authorization'], 
-  exposedHeaders: ['Authorization'],
-  credentials: true, 
-  optionsSuccessStatus: 204,
-}));
+
 //endpoint para eliminar el usuario
 app.delete('/usuarios/:id', async (req, res) => {
   const { id } = req.params;
