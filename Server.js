@@ -435,6 +435,35 @@ app.get('/clases-faltantes/:usuarioId', (req, res) => {
   });
 });
 
+//endpoint para eliminar el usuario
+app.delete('/usuarios/:id', async (req, res) => {
+  const { id } = req.params;
+  const connection = await pool.getConnection(); // Usa tu conexión a la base de datos
+
+  try {
+    await connection.beginTransaction();
+
+    // 1. Eliminar registros relacionados en la tabla "asistencia"
+    await connection.query('DELETE FROM asistencia WHERE id_usuario = ?', [id]);
+
+    // 2. Eliminar registros relacionados en la tabla "usuario_materia"
+    await connection.query('DELETE FROM usuario_materia WHERE usuario_id = ?', [id]);
+
+    // 3. Eliminar el usuario en la tabla "usuario"
+    await connection.query('DELETE FROM usuario WHERE id = ?', [id]);
+
+    await connection.commit();
+    res.status(200).send(`Usuario con ID ${id} eliminado junto con sus relaciones.`);
+  } catch (err) {
+    await connection.rollback();
+    console.error('Error al eliminar usuario:', err);
+    res.status(500).send('Error al eliminar usuario y sus relaciones.');
+  } finally {
+    connection.release();
+  }
+});
+
+
 
 
 app.listen(port, () => {
