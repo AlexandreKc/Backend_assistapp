@@ -328,10 +328,10 @@ app.post('/update-asistencia', (req, res) => {
   }
 
   // Actualizamos el id_tp_asistencia
-  const query = 'UPDATE asistencia SET id_tp_asistencia = 2 WHERE id_clase = ? AND id_usuario = ?';
+  const query = 'UPDATE asistencia SET id_tp_asistencia = 1 WHERE id_clase = ? AND id_usuario = ?';
 
   // Ejecutar la consulta SQL para actualizar la asistencia
-  db.query(query, [id_clase, id_usuario], (err, result) => {
+  pool.query(query, [id_clase, id_usuario], (err, result) => { // Cambiar `db` por `pool`
     if (err) {
       // Error al ejecutar la consulta
       console.error('Error al actualizar la asistencia:', err);
