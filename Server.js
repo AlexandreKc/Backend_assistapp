@@ -9,9 +9,12 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Para realizar consultas sin importar el port
-app.use(cors());
 app.use(express.json());
-
+app.use(cors({
+  origin: '*', // Permite todos los orígenes
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // Métodos permitidos
+  allowedHeaders: ['Content-Type', 'Authorization'], // Encabezados permitidos
+}));
 // Crear un pool de conexiones
 const pool = mysql.createPool({
   host: process.env.DB_SERVER,
