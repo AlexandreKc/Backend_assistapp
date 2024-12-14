@@ -433,7 +433,7 @@ app.delete('/usuarios/:id', async (req, res) => {
     }
   }
 });
-// Endpoint para asignar materias a un usuario
+// Endpoint para asignar materias a un usuario con validación de duplicados
 app.post('/asignar-materias', async (req, res) => {
   const { usuarioId, materias } = req.body;
 
@@ -449,10 +449,19 @@ app.post('/asignar-materias', async (req, res) => {
     // Iniciar una transacción
     await connection.beginTransaction();
 
-    // Insertar las materias para el usuario
-    const query = 'INSERT INTO usuario_materia (usuario_id, materia_id) VALUES (?, ?)';
+    // Insertar las materias para el usuario, evitando duplicados
+    const existeQuery = 'SELECT COUNT(*) AS total FROM usuario_materia WHERE usuario_id = ? AND materia_id = ?';
+    const insertQuery = 'INSERT INTO usuario_materia (usuario_id, materia_id) VALUES (?, ?)';
+
     for (const materiaId of materias) {
-      await connection.query(query, [usuarioId, materiaId]);
+      const [result] = await connection.query(existeQuery, [usuarioId, materiaId]);
+
+      if (result[0].total > 0) {
+        console.log(`La materia con ID ${materiaId} ya está asignada al usuario ${usuarioId}.`);
+        continue; // Saltar si ya está asignada
+      }
+
+      await connection.query(insertQuery, [usuarioId, materiaId]);
     }
 
     // Confirmar la transacción
@@ -464,7 +473,7 @@ app.post('/asignar-materias', async (req, res) => {
     console.error('Error al asignar materias:', error);
     res.status(500).json({ message: 'Error al asignar materias.' });
   } finally {
-    if (connection) connection.release();
+    if (connection) connection.release(); // Liberar conexión
   }
 });
 // Iniciar el servidor
