@@ -353,6 +353,45 @@ app.post('/update-asistencia', (req, res) => {
     // res.status(200).json({ message: 'Asistencia actualizada correctamente' });
   });
 });
+app.get('/conteo-asistencia/:idUsuario/:idMateria', (req, res) => {
+  const { idUsuario, idMateria } = req.params;
+
+  const queryTotalClases = `
+    SELECT COUNT(DISTINCT id_clase) AS totalClases
+    FROM asistencia
+    WHERE id_materia = ?;
+  `;
+
+  const queryAsistencias = `
+    SELECT COUNT(*) AS asistencias
+    FROM asistencia
+    WHERE id_usuario = ? AND id_materia = ? AND id_tp_asistencia = 1;
+  `;
+
+  const totalClasesPromise = new Promise((resolve, reject) => {
+    pool.query(queryTotalClases, [idMateria], (err, results) => {
+      if (err) return reject(err);
+      resolve(results[0].totalClases);
+    });
+  });
+
+  const asistenciasPromise = new Promise((resolve, reject) => {
+    pool.query(queryAsistencias, [idUsuario, idMateria], (err, results) => {
+      if (err) return reject(err);
+      resolve(results[0].asistencias);
+    });
+  });
+
+  Promise.all([totalClasesPromise, asistenciasPromise])
+    .then(([totalClases, asistencias]) => {
+      res.json({ totalClases, asistencias });
+    })
+    .catch((err) => {
+      console.error('Error al obtener conteo de asistencia:', err);
+      res.status(500).json({ error: 'Error al obtener conteo de asistencia' });
+    });
+});
+
 
 app.listen(port, () => {
   console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);
