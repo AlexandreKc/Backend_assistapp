@@ -408,6 +408,32 @@ app.get('/conteo-asistencia/:usuarioId', (req, res) => {
     });
   });
 });
+//ver clases faltantes del estudiante
+app.get('/clases-faltantes/:usuarioId', (req, res) => {
+  const { usuarioId } = req.params;
+  const { materiaId } = req.query;
+
+  if (!usuarioId || !materiaId) {
+    return res.status(400).json({ message: 'UsuarioId y materiaId son requeridos.' });
+  }
+
+  const queryClasesFaltantes = `
+    SELECT c.id_clase, c.nombre AS clase_nombre, c.fecha_creacion
+    FROM clases c
+    LEFT JOIN asistencia a 
+      ON c.id_clase = a.id_clase AND a.id_usuario = ?
+    WHERE c.id_materia = ? AND (a.id_tp_asistencia IS NULL OR a.id_tp_asistencia != 1);
+  `;
+
+  pool.query(queryClasesFaltantes, [usuarioId, materiaId], (err, clasesFaltantes) => {
+    if (err) {
+      console.error('Error al obtener las clases faltantes:', err);
+      return res.status(500).json({ message: 'Error al obtener las clases faltantes.' });
+    }
+
+    res.json(clasesFaltantes);
+  });
+});
 
 
 
