@@ -439,9 +439,10 @@ app.get('/clases-faltantes/:usuarioId', (req, res) => {
 app.delete('/usuarios/:id', async (req, res) => {
   const { id } = req.params;
 
+  let connection;
   try {
     // Obtén una conexión del pool
-    const connection = await pool.getConnection();
+    connection = await pool.getConnection();
 
     // Inicia la transacción
     await connection.beginTransaction();
@@ -456,10 +457,20 @@ app.delete('/usuarios/:id', async (req, res) => {
 
     res.status(200).json({ message: `Usuario con ID ${id} eliminado junto con sus relaciones.` });
   } catch (err) {
+    if (connection) {
+      // Revertir la transacción en caso de error
+      await connection.rollback();
+    }
     console.error('Error al eliminar usuario:', err);
     res.status(500).json({ message: 'Error al eliminar usuario y sus relaciones.' });
+  } finally {
+    if (connection) {
+      // Liberar la conexión
+      connection.release();
+    }
   }
 });
+
 
 
 
