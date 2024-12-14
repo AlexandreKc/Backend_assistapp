@@ -381,12 +381,13 @@ app.get('/conteo-asistencia/:usuarioId', (req, res) => {
     GROUP BY c.id_clase, c.id_materia;
   `;
 
-  // Ejecutar las dos consultas
   pool.query(queryMaterias, [usuarioId], (errMaterias, materias) => {
     if (errMaterias) {
       console.error('Error al obtener las materias:', errMaterias);
       return res.status(500).json({ message: 'Error al obtener las materias.' });
     }
+
+    console.log('Materias obtenidas:', materias);
 
     pool.query(queryClases, [usuarioId, usuarioId], (errClases, clases) => {
       if (errClases) {
@@ -394,7 +395,8 @@ app.get('/conteo-asistencia/:usuarioId', (req, res) => {
         return res.status(500).json({ message: 'Error al obtener las clases.' });
       }
 
-      // Transformar resultados para unir materias y clases
+      console.log('Clases obtenidas:', clases);
+
       const resultado = materias.map((materia) => {
         const clasesMateria = clases.filter((clase) => clase.id_materia === materia.materia_id);
 
@@ -404,8 +406,8 @@ app.get('/conteo-asistencia/:usuarioId', (req, res) => {
           descripcion: materia.descripcion,
           clases: clasesMateria,
           total_clases: clasesMateria.length,
-          total_asistencias: clasesMateria.reduce((sum, clase) => sum + clase.total_asistencias, 0),
-          total_asistidas: clasesMateria.reduce((sum, clase) => sum + clase.asistencias, 0),
+          total_asistencias: clasesMateria.reduce((sum, clase) => sum + (clase.total_asistencias || 0), 0),
+          total_asistidas: clasesMateria.reduce((sum, clase) => sum + (clase.asistencias || 0), 0),
         };
       });
 
