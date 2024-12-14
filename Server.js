@@ -319,6 +319,13 @@ app.get('/clases/:idClase/alumnos', async (req, res) => {
   }
 });
 // Endpoint que utilizaré para actualizar la asistencia
+app.options('/update-asistencia', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.status(204).send();
+});
+
 app.post('/update-asistencia', (req, res) => {
   const { id_clase, id_usuario } = req.body;
 
