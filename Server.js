@@ -362,7 +362,10 @@ app.get('/conteo-asistencia/:usuarioId', (req, res) => {
   }
 
   const queryMaterias = `
-    SELECT um.materia_id, m.nombre AS materia_nombre, m.descripcion
+    SELECT 
+      um.materia_id, 
+      m.nombre AS materia_nombre, 
+      m.descripcion
     FROM usuario_materia um
     INNER JOIN materias m ON um.materia_id = m.id
     WHERE um.usuario_id = ?;
@@ -373,14 +376,16 @@ app.get('/conteo-asistencia/:usuarioId', (req, res) => {
       c.id_clase AS clase_id, 
       c.nombre AS clase_nombre, 
       c.id_materia,
+      a.id_tp_asistencia,
       COUNT(a.id_tp_asistencia) AS total_asistencias,
       SUM(CASE WHEN a.id_tp_asistencia = 1 THEN 1 ELSE 0 END) AS asistencias
     FROM clases c
     LEFT JOIN asistencia a ON c.id_clase = a.id_clase AND a.id_usuario = ?
     WHERE c.id_materia IN (SELECT materia_id FROM usuario_materia WHERE usuario_id = ?)
-    GROUP BY c.id_clase, c.id_materia;
+    GROUP BY c.id_clase, c.id_materia, a.id_tp_asistencia;
   `;
 
+  // Obtener las materias asociadas al usuario
   pool.query(queryMaterias, [usuarioId], (errMaterias, materias) => {
     if (errMaterias) {
       console.error('Error al obtener las materias:', errMaterias);
@@ -389,6 +394,7 @@ app.get('/conteo-asistencia/:usuarioId', (req, res) => {
 
     console.log('Materias obtenidas:', materias);
 
+    // Obtener las clases asociadas a las materias
     pool.query(queryClases, [usuarioId, usuarioId], (errClases, clases) => {
       if (errClases) {
         console.error('Error al obtener las clases:', errClases);
@@ -397,6 +403,7 @@ app.get('/conteo-asistencia/:usuarioId', (req, res) => {
 
       console.log('Clases obtenidas:', clases);
 
+      // Construir la respuesta final
       const resultado = materias.map((materia) => {
         const clasesMateria = clases.filter((clase) => clase.id_materia === materia.materia_id);
 
@@ -404,7 +411,12 @@ app.get('/conteo-asistencia/:usuarioId', (req, res) => {
           materia_id: materia.materia_id,
           materia_nombre: materia.materia_nombre,
           descripcion: materia.descripcion,
-          clases: clasesMateria,
+          clases: clasesMateria.map((clase) => ({
+            clase_id: clase.clase_id,
+            clase_nombre: clase.clase_nombre,
+            id_tp_asistencia: clase.id_tp_asistencia,
+            presente: clase.id_tp_asistencia === 1,
+          })),
           total_clases: clasesMateria.length,
           total_asistencias: clasesMateria.reduce((sum, clase) => sum + (clase.total_asistencias || 0), 0),
           total_asistidas: clasesMateria.reduce((sum, clase) => sum + (clase.asistencias || 0), 0),
@@ -415,6 +427,7 @@ app.get('/conteo-asistencia/:usuarioId', (req, res) => {
     });
   });
 });
+
 
 
 app.listen(port, () => {
