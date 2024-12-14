@@ -438,31 +438,29 @@ app.get('/clases-faltantes/:usuarioId', (req, res) => {
 //endpoint para eliminar el usuario
 app.delete('/usuarios/:id', async (req, res) => {
   const { id } = req.params;
-
   let connection;
+
   try {
     // Obtén una conexión del pool
     connection = await pool.getConnection();
 
-    // Inicia la transacción
+    // Inicia la transacción (opcional, pero recomendado)
     await connection.beginTransaction();
 
-    // Eliminar registros relacionados
-    await connection.query('DELETE FROM asistencia WHERE id_usuario = ?', [id]);
-    await connection.query('DELETE FROM usuario_materia WHERE usuario_id = ?', [id]);
+    // Eliminar el usuario (los triggers manejarán las relaciones)
     await connection.query('DELETE FROM usuario WHERE id = ?', [id]);
 
-    // Confirma la transacción
+    // Confirmar la transacción
     await connection.commit();
 
-    res.status(200).json({ message: `Usuario con ID ${id} eliminado junto con sus relaciones.` });
+    res.status(200).json({ message: `Usuario con ID ${id} eliminado correctamente.` });
   } catch (err) {
     if (connection) {
       // Revertir la transacción en caso de error
       await connection.rollback();
     }
     console.error('Error al eliminar usuario:', err);
-    res.status(500).json({ message: 'Error al eliminar usuario y sus relaciones.' });
+    res.status(500).json({ message: 'Error al eliminar el usuario.' });
   } finally {
     if (connection) {
       // Liberar la conexión
@@ -470,6 +468,7 @@ app.delete('/usuarios/:id', async (req, res) => {
     }
   }
 });
+
 
 
 
