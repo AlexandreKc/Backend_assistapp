@@ -1,7 +1,7 @@
 // Modulos necesarios
 const express = require('express');
 const cors = require('cors');
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 
 // Instancia express
@@ -17,15 +17,14 @@ app.use(cors({
 }));
 // Crear un pool de conexiones
 const pool = mysql.createPool({
-  host: process.env.DB_SERVER,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME,
+  host: process.env.DB_SERVER || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASS || '',
+  database: process.env.DB_NAME || 'test',
   waitForConnections: true,
-  connectionLimit: 10,  // Ajusta el límite de conexiones según lo necesites
-  queueLimit: 0
+  connectionLimit: 10,
+  queueLimit: 0,
 });
-
 // Usar el pool para realizar consultas
 app.post('/login', (req, res) => {
   const { correo, password } = req.body;
