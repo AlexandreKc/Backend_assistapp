@@ -1,18 +1,24 @@
-// Modulos necesarios
+// Módulos necesarios
 const express = require('express');
 const cors = require('cors');
-const mysql = require('mysql2');
+const mysql = require('mysql2/promise'); // Cambiado a mysql2/promise
 const bcrypt = require('bcryptjs');
 
 // Instancia express
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Para realizar consultas sin importar el port
-app.use(cors());
+// Configuración del middleware CORS
+app.use(cors({
+  origin: 'http://localhost:8100', // Cambia esto según tu entorno
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Middleware para parsear JSON
 app.use(express.json());
 
-// Crear un pool de conexiones
+// Crear un pool de conexiones usando mysql2/promise
 const pool = mysql.createPool({
   host: process.env.DB_SERVER,
   user: process.env.DB_USER,
@@ -23,282 +29,239 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-// Usar el pool para realizar consultas
-app.post('/login', (req, res) => {
+// Endpoint para login
+app.post('/login', async (req, res) => {
   const { correo, password } = req.body;
   
-  // Verificar que se proporcionaron el correo y la contraseña
   if (!correo || !password) {
     return res.status(400).json({ message: 'Por favor, proporciona correo y contraseña' });
   }
   
-  // Usar el pool para consultar la base de datos
-  pool.query('SELECT id, nombre, id_tp_usuario, contrasena FROM usuario WHERE correo = ?', [correo], (err, results) => {
-    if (err) {
-      console.error('Error en la consulta:', err.stack);
-      return res.status(500).send('Error en la consulta');
-    }
+  try {
+    const [results] = await pool.query('SELECT id, nombre, id_tp_usuario, contrasena FROM usuario WHERE correo = ?', [correo]);
 
     if (results.length > 0) {
-      // Si el usuario existe, verificar la contraseña encriptada
-      bcrypt.compare(password, results[0].contrasena, (err, isMatch) => {
-        if (err) {
-          return res.status(500).json({ message: 'Error al verificar la contraseña' });
-        }
+      const isMatch = await bcrypt.compare(password, results[0].contrasena);
 
-        if (isMatch) {
-          // Si las contraseñas coinciden
-          res.json({
-            valid: true,
-            id: results[0].id,  // Enviar el ID del usuario
-            nombre: results[0].nombre,
-            id_tp_usuario: results[0].id_tp_usuario // Incluir el tipo de usuario en la respuesta
-          });
-        } else {
-          // Si las contraseñas no coinciden
-          res.json({ valid: false });
-        }
-      });
+      if (isMatch) {
+        return res.json({
+          valid: true,
+          id: results[0].id,
+          nombre: results[0].nombre,
+          id_tp_usuario: results[0].id_tp_usuario
+        });
+      } else {
+        return res.json({ valid: false });
+      }
     } else {
-      // Si no se encuentra el usuario, devolver respuesta inválida
-      res.json({ valid: false });
+      return res.json({ valid: false });
     }
-  });
+  } catch (err) {
+    console.error('Error en la consulta o verificación de contraseña:', err);
+    return res.status(500).json({ message: 'Error en el servidor' });
+  }
 });
 
-
 // Endpoint para registrar un nuevo usuario
-app.post('/registro', (req, res) => {
+app.post('/registro', async (req, res) => {
   const { nombre, correo, contrasena } = req.body;
   
-  // Validaciones de entrada
   if (!nombre || !correo || !contrasena) {
     return res.status(400).json({ error: 'Todos los campos son requeridos.' });
   }
 
-  // Encriptar la contraseña antes de guardarla
-  bcrypt.hash(contrasena, 10, (err, hashedPassword) => {
-    if (err) {
-      return res.status(500).json({ error: 'Error al encriptar la contraseña' });
-    }
+  try {
+    const hashedPassword = await bcrypt.hash(contrasena, 10);
+    const query = 'INSERT INTO usuario (correo, nombre, contrasena, id_tp_usuario) VALUES (?, ?, ?, 1)';
+    await pool.query(query, [correo, nombre, hashedPassword]);
 
-    // Añadir la lógica para guardar el nuevo usuario en la base de datos
-    const query = 'INSERT INTO usuario (correo, nombre, contrasena, id_tp_usuario) VALUES (?, ?, ?, 1)'; // id_tp_usuario por defecto es 1
-    pool.query(query, [correo, nombre, hashedPassword], (error, results) => {
-      if (error) {
-        return res.status(500).json({ error: 'Correo ya registrado, recupera tu contraseña' });
-      }
-      res.status(201).json({ message: 'Usuario fue registrado con éxito.' });
-    });
-  });
+    res.status(201).json({ message: 'Usuario fue registrado con éxito.' });
+  } catch (error) {
+    console.error('Error al registrar el usuario:', error);
+    res.status(500).json({ error: 'Correo ya registrado, recupera tu contraseña' });
+  }
 });
 
 // Ruta para verificar si el correo existe
-app.post('/validar-correo', (req, res) => {
-  const { correo } = req.body; // Obtener el correo del cuerpo de la solicitud
+app.post('/validar-correo', async (req, res) => {
+  const { correo } = req.body;
   
-  // Consulta a la base de datos
-  const query = 'SELECT * FROM usuario WHERE correo = ?';
-  pool.query(query, [correo], (err, results) => {
-    if (err) {
-      res.status(500).json({ error: 'Error en el servidor' });
-    } else {
-      if (results.length > 0) {
-        res.json({ existe: true });
-      } else {
-        res.json({ existe: false });
-      }
-    }
-  });
+  try {
+    const [results] = await pool.query('SELECT * FROM usuario WHERE correo = ?', [correo]);
+    res.json({ existe: results.length > 0 });
+  } catch (err) {
+    console.error('Error en la consulta:', err.stack);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
 });
 
 // Ruta para cambiar la contraseña
-app.post('/cambiar-contrasena', (req, res) => {
+app.post('/cambiar-contrasena', async (req, res) => {
   const { correo, nuevaContrasena } = req.body;
 
   if (!correo || !nuevaContrasena) {
     return res.status(400).json({ message: 'Por favor, proporciona el correo y la nueva contraseña' });
   }
 
-  // Encriptar la nueva contraseña antes de actualizarla
-  bcrypt.hash(nuevaContrasena, 10, (err, hashedPassword) => {
-    if (err) {
-      return res.status(500).json({ message: 'Error al encriptar la nueva contraseña' });
+  try {
+    const hashedPassword = await bcrypt.hash(nuevaContrasena, 10);
+    const [result] = await pool.query('UPDATE usuario SET contrasena = ? WHERE correo = ?', [hashedPassword, correo]);
+
+    if (result.affectedRows > 0) {
+      res.json({ message: 'Contraseña cambiada exitosamente' });
+    } else {
+      res.status(404).json({ message: 'Correo no registrado' });
     }
-
-    const query = 'UPDATE usuario SET contrasena = ? WHERE correo = ?';
-    pool.query(query, [hashedPassword, correo], (err, results) => {
-      if (err) {
-        console.error('Error en la consulta:', err.stack);
-        return res.status(500).json({ message: 'Error al cambiar la contraseña' });
-      }
-
-      if (results.affectedRows > 0) {
-        res.json({ message: 'Contraseña cambiada exitosamente' });
-      } else {
-        res.status(404).json({ message: 'Correo no registrado' });
-      }
-    });
-  });
+  } catch (err) {
+    console.error('Error al cambiar la contraseña:', err);
+    res.status(500).json({ message: 'Error al cambiar la contraseña' });
+  }
 });
 
-// Ruta para obtener todos los usuarios (ejemplo)
-app.get('/usuarios', (req, res) => {
-  pool.query('SELECT * FROM usuario', (err, results) => {
-    if (err) {
-      console.error('Error en la consulta:', err.stack);
-      return res.status(500).send('Error en la consulta');
-    }
+// Ruta para obtener todos los usuarios
+app.get('/usuarios', async (req, res) => {
+  try {
+    const [results] = await pool.query('SELECT * FROM usuario');
     res.json(results);
-  });
+  } catch (err) {
+    console.error('Error en la consulta:', err.stack);
+    res.status(500).send('Error en la consulta');
+  }
 });
+
 // Endpoint para obtener las materias asociadas a un usuario
-app.get('/materias/usuario/:usuarioId', (req, res) => {
-  const { usuarioId } = req.params;  // Obtener el usuarioId de los parámetros de la URL
+app.get('/materias/usuario/:usuarioId', async (req, res) => {
+  const { usuarioId } = req.params;
 
   if (!usuarioId) {
     return res.status(400).json({ message: 'Por favor, proporciona un usuarioId' });
   }
 
-  // Consulta para obtener las materias asociadas al usuario
-  const query = `
-    SELECT um.materia_id, m.nombre, m.descripcion 
-    FROM usuario_materia um 
-    INNER JOIN materias m ON um.materia_id = m.id 
-    WHERE um.usuario_id = ?;
-  `;
+  try {
+    const query = `
+      SELECT um.materia_id, m.nombre, m.descripcion 
+      FROM usuario_materia um 
+      INNER JOIN materias m ON um.materia_id = m.id 
+      WHERE um.usuario_id = ?;
+    `;
 
-  // Realizar la consulta usando el pool de conexiones
-  pool.query(query, [usuarioId], (err, results) => {
-    if (err) {
-      console.error('Error al obtener las materias:', err.stack);
-      return res.status(500).json({ message: 'Error al obtener las materias' });
-    }
-
-    // Enviar las materias como respuesta en formato JSON
+    const [results] = await pool.query(query, [usuarioId]);
     res.json(results);
-  });
+  } catch (err) {
+    console.error('Error al obtener las materias:', err.stack);
+    res.status(500).json({ message: 'Error al obtener las materias' });
+  }
 });
+
 // Endpoint para obtener todas las materias
-app.get('/materias', (req, res) => {
-  pool.query('SELECT * FROM materias', (err, results) => {
-    if (err) {
-      console.error('Error en la consulta:', err.stack);
-      return res.status(500).send('Error en la consulta');
-    }
+app.get('/materias', async (req, res) => {
+  try {
+    const [results] = await pool.query('SELECT * FROM materias');
     res.json(results);
-  });
+  } catch (err) {
+    console.error('Error en la consulta:', err.stack);
+    res.status(500).send('Error en la consulta');
+  }
 });
+
 // Ruta para crear una nueva clase
-app.post('/crear-clase', (req, res) => {
+app.post('/crear-clase', async (req, res) => {
   const { idMateria } = req.body;
 
-  // Validar si se proporcionó el idMateria
   if (!idMateria) {
     return res.status(400).json({ message: 'Por favor, proporciona el id de la materia' });
   }
 
-  // Obtener el nombre de la materia para generar el nombre de la clase
-  pool.query('SELECT nombre FROM materias WHERE id = ?', [idMateria], (err, results) => {
-    if (err) {
-      console.error('Error al obtener los detalles de la materia:', err.stack);
-      return res.status(500).json({ message: 'Error al obtener los detalles de la materia' });
-    }
+  try {
+    // Obtener el nombre de la materia
+    const [materias] = await pool.query('SELECT nombre FROM materias WHERE id = ?', [idMateria]);
 
-    if (results.length === 0) {
+    if (materias.length === 0) {
       return res.status(404).json({ message: 'Materia no encontrada' });
     }
 
-    const nombreMateria = results[0].nombre;
+    const nombreMateria = materias[0].nombre;
 
-    // Obtener el número de la última clase creada para esta materia
-    pool.query('SELECT COUNT(*) AS totalClases FROM clases WHERE id_materia = ?', [idMateria], (err, results) => {
-      if (err) {
-        console.error('Error al contar las clases:', err.stack);
-        return res.status(500).json({ message: 'Error al contar las clases' });
-      }
+    // Contar las clases existentes para esta materia
+    const [clasesCount] = await pool.query('SELECT COUNT(*) AS totalClases FROM clases WHERE id_materia = ?', [idMateria]);
+    const claseNumero = clasesCount[0].totalClases + 1;
 
-      const claseNumero = results[0].totalClases + 1;  // Incrementar el número de clase
+    // Generar el nombre y el ID de la nueva clase
+    const nombreClase = `${nombreMateria} clase ${claseNumero}`;
+    const idClase = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const fechaCreacion = new Date();
 
-      // Generar el nombre de la clase concatenando el nombre de la materia y el número de clase
-      const nombreClase = `${nombreMateria} clase ${claseNumero}`;
+    // Insertar la nueva clase
+    await pool.query(
+      'INSERT INTO clases (id_clase, id_materia, nombre, fecha_creacion) VALUES (?, ?, ?, ?)',
+      [idClase, idMateria, nombreClase, fechaCreacion]
+    );
 
-      // Crear el ID de la nueva clase (6 caracteres aleatorios)
-      const idClase = Math.random().toString(36).substring(2, 8).toUpperCase();
-
-      // Obtener la fecha actual
-      const fechaCreacion = new Date();
-
-      // Insertar la nueva clase en la base de datos
-      pool.query(
-        'INSERT INTO clases (id_clase, id_materia, nombre, fecha_creacion) VALUES (?, ?, ?, ?)',
-        [idClase, idMateria, nombreClase, fechaCreacion],
-        (err, results) => {
-          if (err) {
-            console.error('Error al insertar la clase:', err.stack);
-            return res.status(500).json({ message: 'Error al insertar la clase' });
-          }
-
-          res.status(201).json({
-            message: 'Clase creada exitosamente',
-            idClase: idClase,  
-            nombreClase: nombreClase  
-          });
-        }
-      );
+    res.status(201).json({
+      message: 'Clase creada exitosamente',
+      idClase: idClase,
+      nombreClase: nombreClase
     });
-  });
+  } catch (err) {
+    console.error('Error al crear la clase:', err.stack);
+    res.status(500).json({ message: 'Error al crear la clase' });
+  }
 });
 
-
 // Ruta para obtener todas las clases de una materia específica
-app.get('/clases/materia/:materiaId', (req, res) => {
-  const { materiaId } = req.params;  // Obtener el materiaId de los parámetros de la URL
+app.get('/clases/materia/:materiaId', async (req, res) => {
+  const { materiaId } = req.params;
 
   if (!materiaId) {
     return res.status(400).json({ message: 'Por favor, proporciona un materiaId' });
   }
 
-  // Consulta para obtener las clases asociadas a la materia
-  const query = `
-    SELECT c.id_materia, c.id_clase, c.nombre, c.fecha_creacion 
-    FROM clases c
-    WHERE c.id_materia = ?;
-  `;
+  try {
+    const query = `
+      SELECT c.id_materia, c.id_clase, c.nombre, c.fecha_creacion 
+      FROM clases c
+      WHERE c.id_materia = ?;
+    `;
 
-  pool.query(query, [materiaId], (err, results) => {
-    if (err) {
-      console.error('Error al obtener las clases:', err.stack);
-      return res.status(500).json({ message: 'Error al obtener las clases' });
-    }
-
+    const [results] = await pool.query(query, [materiaId]);
     res.json(results);
-  });
+  } catch (err) {
+    console.error('Error al obtener las clases:', err.stack);
+    res.status(500).json({ message: 'Error al obtener las clases.' });
+  }
 });
-//obtener alumnos de una materia
+
+// Obtener alumnos de una materia
 app.get('/materias/:idMateria/alumnos', async (req, res) => {
   const { idMateria } = req.params;
+
+  if (!idMateria) {
+    return res.status(400).json({ message: 'Por favor, proporciona un idMateria válido.' });
+  }
+
   try {
     const query = `
       SELECT u.id, u.nombre, u.correo 
       FROM usuario_materia um
       JOIN usuario u ON um.usuario_id = u.id
       WHERE um.materia_id = ?`;
-    pool.query(query, [idMateria], (err, results) => {
-      if (err) {
-        console.error('Error en la consulta:', err.stack);
-        return res.status(500).send('Error en la consulta');
-      }
-      res.json({ alumnos: results });
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error al obtener los alumnos de la materia' });
+    
+    const [results] = await pool.query(query, [idMateria]);
+    res.json({ alumnos: results });
+  } catch (err) {
+    console.error('Error en la consulta:', err.stack);
+    res.status(500).json({ message: 'Error al obtener los alumnos de la materia' });
   }
 });
+
 // Obtener alumnos de una clase
 app.get('/clases/:idClase/alumnos', async (req, res) => {
   const { idClase } = req.params;
+
+  if (!idClase) {
+    return res.status(400).json({ message: 'Por favor, proporciona un idClase válido.' });
+  }
+
   try {
     const query = `
       SELECT u.id, u.nombre, u.correo, a.id_tp_asistencia
@@ -306,19 +269,15 @@ app.get('/clases/:idClase/alumnos', async (req, res) => {
       JOIN usuario u ON a.id_usuario = u.id
       WHERE a.id_clase = ?`;
     
-    pool.query(query, [idClase], (err, results) => {
-      if (err) {
-        console.error('Error en la consulta:', err.stack);
-        return res.status(500).send('Error en la consulta');
-      }
-      res.json({ alumnos: results });
-    });
-  } catch (error) {
-    console.error(error);
+    const [results] = await pool.query(query, [idClase]);
+    res.json({ alumnos: results });
+  } catch (err) {
+    console.error('Error en la consulta:', err.stack);
     res.status(500).json({ error: 'Error al obtener los alumnos de la clase' });
   }
 });
-// Endpoint que utilizaré para actualizar la asistencia
+
+// Endpoint para actualizar la asistencia
 app.options('/update-asistencia', (req, res) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -326,7 +285,7 @@ app.options('/update-asistencia', (req, res) => {
   res.status(204).send();
 });
 
-app.post('/update-asistencia', (req, res) => {
+app.post('/update-asistencia', async (req, res) => {
   console.log('Solicitud POST recibida:', req.body);
 
   const { id_clase, id_usuario } = req.body;
@@ -336,80 +295,75 @@ app.post('/update-asistencia', (req, res) => {
     return res.status(400).json({ error: 'Faltan parámetros' });
   }
 
-  const query = 'UPDATE asistencia SET id_tp_asistencia = 1 WHERE id_clase = ? AND id_usuario = ?';
-
-  pool.query(query, [id_clase, id_usuario], (err, result) => {
-    if (err) {
-      console.error('Error al actualizar la asistencia:', err);
-      return res.status(500).json({ error: 'Error al actualizar la asistencia' });
-    }
+  try {
+    const query = 'UPDATE asistencia SET id_tp_asistencia = 1 WHERE id_clase = ? AND id_usuario = ?';
+    const [result] = await pool.query(query, [id_clase, id_usuario]);
 
     if (result.affectedRows === 0) {
       console.warn('No se encontró el registro para actualizar');
       return res.status(404).json({ error: 'No se encontró la clase o el usuario para actualizar' });
     }
 
-    // console.log('Asistencia actualizada correctamente');
-    // res.status(200).json({ message: 'Asistencia actualizada correctamente' });
-  });
+    res.status(200).json({ message: 'Asistencia actualizada correctamente' });
+  } catch (err) {
+    console.error('Error al actualizar la asistencia:', err);
+    res.status(500).json({ error: 'Error al actualizar la asistencia' });
+  }
 });
-//metodo para contar clases y asistencias
-app.get('/conteo-asistencia/:usuarioId', (req, res) => {
+
+// Método para contar clases y asistencias
+app.get('/conteo-asistencia/:usuarioId', async (req, res) => {
   const { usuarioId } = req.params;
 
   if (!usuarioId) {
     return res.status(400).json({ message: 'Por favor, proporciona un usuarioId válido.' });
   }
 
-  const queryMaterias = `
-    SELECT um.materia_id, m.nombre AS materia_nombre, m.descripcion
-    FROM usuario_materia um
-    INNER JOIN materias m ON um.materia_id = m.id
-    WHERE um.usuario_id = ?;
-  `;
+  try {
+    const queryMaterias = `
+      SELECT um.materia_id, m.nombre AS materia_nombre, m.descripcion
+      FROM usuario_materia um
+      INNER JOIN materias m ON um.materia_id = m.id
+      WHERE um.usuario_id = ?;
+    `;
 
-  const queryClases = `
-    SELECT 
-      c.id_materia AS materia_id,
-      COUNT(DISTINCT c.id_clase) AS total_clases,
-      SUM(CASE WHEN a.id_tp_asistencia = 1 THEN 1 ELSE 0 END) AS total_asistencias
-    FROM clases c
-    LEFT JOIN asistencia a 
-      ON c.id_clase = a.id_clase AND a.id_usuario = ?
-    WHERE c.id_materia IN (SELECT materia_id FROM usuario_materia WHERE usuario_id = ?)
-    GROUP BY c.id_materia;
-  `;
+    const [materias] = await pool.query(queryMaterias, [usuarioId]);
 
-  pool.query(queryMaterias, [usuarioId], (errMaterias, materias) => {
-    if (errMaterias) {
-      console.error('Error al obtener las materias:', errMaterias);
-      return res.status(500).json({ message: 'Error al obtener las materias.' });
-    }
+    const queryClases = `
+      SELECT 
+        c.id_materia AS materia_id,
+        COUNT(DISTINCT c.id_clase) AS total_clases,
+        SUM(CASE WHEN a.id_tp_asistencia = 1 THEN 1 ELSE 0 END) AS total_asistencias
+      FROM clases c
+      LEFT JOIN asistencia a 
+        ON c.id_clase = a.id_clase AND a.id_usuario = ?
+      WHERE c.id_materia IN (SELECT materia_id FROM usuario_materia WHERE usuario_id = ?)
+      GROUP BY c.id_materia;
+    `;
 
-    pool.query(queryClases, [usuarioId, usuarioId], (errClases, clases) => {
-      if (errClases) {
-        console.error('Error al obtener las clases:', errClases);
-        return res.status(500).json({ message: 'Error al obtener las clases.' });
-      }
+    const [clases] = await pool.query(queryClases, [usuarioId, usuarioId]);
 
-      const resultado = materias.map((materia) => {
-        const claseData = clases.find((clase) => clase.materia_id === materia.materia_id);
+    const resultado = materias.map((materia) => {
+      const claseData = clases.find((clase) => clase.materia_id === materia.materia_id);
 
-        return {
-          materia_id: materia.materia_id,
-          materia_nombre: materia.materia_nombre,
-          descripcion: materia.descripcion,
-          total_clases: claseData?.total_clases || 0,
-          total_asistencias: claseData?.total_asistencias || 0,
-        };
-      });
-
-      res.json(resultado);
+      return {
+        materia_id: materia.materia_id,
+        materia_nombre: materia.materia_nombre,
+        descripcion: materia.descripcion,
+        total_clases: claseData?.total_clases || 0,
+        total_asistencias: claseData?.total_asistencias || 0,
+      };
     });
-  });
+
+    res.json(resultado);
+  } catch (error) {
+    console.error('Error al contar clases y asistencias:', error);
+    res.status(500).json({ error: 'Error al contar clases y asistencias' });
+  }
 });
-//ver clases faltantes del estudiante
-app.get('/clases-faltantes/:usuarioId', (req, res) => {
+
+// Ver clases faltantes del estudiante
+app.get('/clases-faltantes/:usuarioId', async (req, res) => {
   const { usuarioId } = req.params;
   const { materiaId } = req.query;
 
@@ -417,47 +371,57 @@ app.get('/clases-faltantes/:usuarioId', (req, res) => {
     return res.status(400).json({ message: 'UsuarioId y materiaId son requeridos.' });
   }
 
-  const queryClasesFaltantes = `
-    SELECT c.id_clase, c.nombre AS clase_nombre, c.fecha_creacion
-    FROM clases c
-    LEFT JOIN asistencia a 
-      ON c.id_clase = a.id_clase AND a.id_usuario = ?
-    WHERE c.id_materia = ? AND (a.id_tp_asistencia IS NULL OR a.id_tp_asistencia != 1);
-  `;
+  try {
+    const queryClasesFaltantes = `
+      SELECT c.id_clase, c.nombre AS clase_nombre, c.fecha_creacion
+      FROM clases c
+      LEFT JOIN asistencia a 
+        ON c.id_clase = a.id_clase AND a.id_usuario = ?
+      WHERE c.id_materia = ? AND (a.id_tp_asistencia IS NULL OR a.id_tp_asistencia != 1);
+    `;
 
-  pool.query(queryClasesFaltantes, [usuarioId, materiaId], (err, clasesFaltantes) => {
-    if (err) {
-      console.error('Error al obtener las clases faltantes:', err);
-      return res.status(500).json({ message: 'Error al obtener las clases faltantes.' });
-    }
-
+    const [clasesFaltantes] = await pool.query(queryClasesFaltantes, [usuarioId, materiaId]);
     res.json(clasesFaltantes);
-  });
+  } catch (err) {
+    console.error('Error al obtener las clases faltantes:', err);
+    res.status(500).json({ message: 'Error al obtener las clases faltantes.' });
+  }
 });
 
-//endpoint para eliminar el usuario
+// Endpoint para eliminar el usuario
 app.delete('/usuarios/:id', async (req, res) => {
   const { id } = req.params;
   let connection;
 
-  try {
-    // Obtén una conexión del pool
-    connection = await pool.getConnection();
+  console.log(`Recibiendo solicitud para eliminar usuario con ID: ${id}`);
 
-    // Inicia la transacción (opcional, pero recomendado)
+  try {
+    // Obtener una conexión del pool
+    connection = await pool.getConnection();
+    console.log('Conexión a la base de datos establecida.');
+
+    // Iniciar la transacción
     await connection.beginTransaction();
+    console.log('Transacción iniciada.');
 
     // Eliminar el usuario (los triggers manejarán las relaciones)
     await connection.query('DELETE FROM usuario WHERE id = ?', [id]);
+    console.log(`Usuario con ID ${id} eliminado de la tabla 'usuario'.`);
 
     // Confirmar la transacción
     await connection.commit();
+    console.log('Transacción confirmada.');
 
     res.status(200).json({ message: `Usuario con ID ${id} eliminado correctamente.` });
   } catch (err) {
     if (connection) {
-      // Revertir la transacción en caso de error
-      await connection.rollback();
+      try {
+        // Revertir la transacción en caso de error
+        await connection.rollback();
+        console.log('Transacción revertida debido a un error.');
+      } catch (rollbackErr) {
+        console.error('Error al revertir la transacción:', rollbackErr);
+      }
     }
     console.error('Error al eliminar usuario:', err);
     res.status(500).json({ message: 'Error al eliminar el usuario.' });
@@ -465,15 +429,12 @@ app.delete('/usuarios/:id', async (req, res) => {
     if (connection) {
       // Liberar la conexión
       connection.release();
+      console.log('Conexión liberada.');
     }
   }
 });
 
-
-
-
-
-
-app.listen(port, () => {
+// Iniciar el servidor
+app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);
 });
