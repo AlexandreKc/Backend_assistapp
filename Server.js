@@ -433,7 +433,40 @@ app.delete('/usuarios/:id', async (req, res) => {
     }
   }
 });
+// Endpoint para asignar materias a un usuario
+app.post('/asignar-materias', async (req, res) => {
+  const { usuarioId, materias } = req.body;
 
+  if (!usuarioId || !Array.isArray(materias) || materias.length === 0) {
+    return res.status(400).json({ message: 'Datos inválidos. Verifica el usuarioId y las materias.' });
+  }
+
+  let connection;
+
+  try {
+    connection = await pool.getConnection();
+
+    // Iniciar una transacción
+    await connection.beginTransaction();
+
+    // Insertar las materias para el usuario
+    const query = 'INSERT INTO usuario_materia (usuario_id, materia_id) VALUES (?, ?)';
+    for (const materiaId of materias) {
+      await connection.query(query, [usuarioId, materiaId]);
+    }
+
+    // Confirmar la transacción
+    await connection.commit();
+
+    res.status(201).json({ message: 'Materias asignadas exitosamente.' });
+  } catch (error) {
+    if (connection) await connection.rollback(); // Revertir en caso de error
+    console.error('Error al asignar materias:', error);
+    res.status(500).json({ message: 'Error al asignar materias.' });
+  } finally {
+    if (connection) connection.release();
+  }
+});
 // Iniciar el servidor
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);
