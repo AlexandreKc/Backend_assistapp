@@ -480,12 +480,22 @@ app.post('/asignar-materias', async (req, res) => {
 app.post('/remover-materias', async (req, res) => {
   const { usuarioId, materiasIds } = req.body;
 
+  // Validar que los datos necesarios están presentes
+  if (!usuarioId || !Array.isArray(materiasIds) || materiasIds.length === 0) {
+    return res.status(400).json({ message: 'UsuarioId y materiasIds son requeridos, y materiasIds debe ser un array no vacío.' });
+  }
+
   try {
+    // Ejecutar la consulta SQL
     const query = `DELETE FROM usuario_materia WHERE usuario_id = ? AND materia_id IN (?)`;
     await pool.query(query, [usuarioId, materiasIds]);
+
+    // Responder con éxito
     res.json({ message: 'Materias removidas con éxito.' });
   } catch (error) {
     console.error('Error al remover materias:', error);
+
+    // Responder con un mensaje de error
     res.status(500).json({ message: 'Error al remover materias.' });
   }
 });
