@@ -476,6 +476,19 @@ app.post('/asignar-materias', async (req, res) => {
     if (connection) connection.release(); // Liberar conexión
   }
 });
+//endpoint para remover las materias de un alumo
+app.post('/remover-materias', async (req, res) => {
+  const { usuarioId, materiasIds } = req.body;
+
+  try {
+    const query = `DELETE FROM usuario_materia WHERE usuario_id = ? AND materia_id IN (?)`;
+    await pool.query(query, [usuarioId, materiasIds]);
+    res.json({ message: 'Materias removidas con éxito.' });
+  } catch (error) {
+    console.error('Error al remover materias:', error);
+    res.status(500).json({ message: 'Error al remover materias.' });
+  }
+});
 // Iniciar el servidor
 app.listen(port, '0.0.0.0', () => {
   console.log(`Servidor en funcionamiento en http://0.0.0.0:${port}`);
