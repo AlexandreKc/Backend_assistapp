@@ -10,9 +10,9 @@ const port = process.env.PORT || 3000;
 
 // Configuración del middleware CORS
 app.use(cors({
-  origin: '*', // Permite cualquier origen
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Métodos HTTP permitidos
-  allowedHeaders: ['Content-Type', 'Authorization'] // Cabeceras permitidas
+  origin: ['capacitor://localhost', 'http://localhost', 'https://backendassistapp-production.up.railway.app'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 // Middleware para parsear JSON
 app.use(express.json());
